@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
-const genToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+const secretKey = process.env.JWT_SECRET || 'algopilot_super_secret_jwt_key_2024';
+const genToken = (id) => jwt.sign({ id }, secretKey, { expiresIn: process.env.JWT_EXPIRE || '30d' });
 
 const safeUser = (u) => ({
   _id: u._id, id: u._id, name: u.name, email: u.email, username: u.username,
