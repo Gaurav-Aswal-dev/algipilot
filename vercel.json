@@ -1,6 +1,11 @@
 {
   "buildCommand": "cd algopilot/client && npm install && npm run build",
   "outputDirectory": "algopilot/client/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "algopilot/server/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
