@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd algopilot/client && npm install && npm run build",
+  "outputDirectory": "algopilot/client/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
