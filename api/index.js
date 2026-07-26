@@ -9,22 +9,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Cloud Connection
+// MongoDB Cloud Connection with Cached Connection Pool for Vercel Serverless
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://parkwise:Shanu2006@cluster0.8w7mmuh.mongodb.net/algopilot?retryWrites=true&w=majority&appName=Cluster0';
 const JWT_SECRET = process.env.JWT_SECRET || 'algopilot_super_secret_jwt_key_2024';
 
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 const connectDB = async () => {
-  if (mongoose.connection.readyState >= 1) return;
-  try {
-    await mongoose.connect(MONGO_URI);
-  } catch (e) {
-    console.error('Mongo connection error:', e);
+  if (cached.conn) return cached.conn;
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI, {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 10000,
+    }).then((m) => m);
   }
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+  return cached.conn;
 };
 
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection error in middleware:', err);
+    res.status(500).json({ success: false, message: 'Database connection failed' });
+  }
 });
 
 // SCHEMAS & MODELS
