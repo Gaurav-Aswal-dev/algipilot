@@ -123,13 +123,16 @@ const protect = async (req, res, next) => {
   }
 };
 
+// CREATE DUAL ROUTER SUPPORT (FOR BOTH /api AND ROOT PATHS ON VERCEL)
+const apiRouter = express.Router();
+
 // HEALTH
-app.get('/api/health', (req, res) => {
+apiRouter.get('/health', (req, res) => {
   res.json({ success: true, message: 'AlgoPilot Full-Stack Vercel Serverless API is live!', timestamp: new Date() });
 });
 
 // AUTH ROUTES
-app.post('/api/auth/register', async (req, res) => {
+apiRouter.post('/auth/register', async (req, res) => {
   try {
     const { name, email, password, username } = req.body;
     if (!name || !email || !password) {
@@ -153,7 +156,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+apiRouter.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -174,12 +177,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/auth/me', protect, (req, res) => {
+apiRouter.get('/auth/me', protect, (req, res) => {
   res.json({ success: true, user: safeUser(req.user) });
 });
 
 // QUESTIONS ROUTES
-app.get('/api/questions', protect, async (req, res) => {
+apiRouter.get('/questions', protect, async (req, res) => {
   try {
     const { search, platform, difficulty, topic, limit = 50 } = req.query;
     const query = {};
@@ -195,7 +198,7 @@ app.get('/api/questions', protect, async (req, res) => {
   }
 });
 
-app.post('/api/questions', protect, async (req, res) => {
+apiRouter.post('/questions', protect, async (req, res) => {
   try {
     const question = await Question.create(req.body);
     res.status(201).json({ success: true, question });
@@ -205,7 +208,7 @@ app.post('/api/questions', protect, async (req, res) => {
 });
 
 // SOLVED ROUTES
-app.get('/api/solved', protect, async (req, res) => {
+apiRouter.get('/solved', protect, async (req, res) => {
   try {
     const solved = await SolvedQuestion.find({ user: req.user._id })
       .populate('question')
@@ -216,7 +219,7 @@ app.get('/api/solved', protect, async (req, res) => {
   }
 });
 
-app.post('/api/solved', protect, async (req, res) => {
+apiRouter.post('/solved', protect, async (req, res) => {
   try {
     const { questionId, timeTaken, notes, tags } = req.body;
     const solved = await SolvedQuestion.create({
@@ -242,7 +245,7 @@ app.post('/api/solved', protect, async (req, res) => {
 });
 
 // REVISION ROUTES
-app.get('/api/revision', protect, async (req, res) => {
+apiRouter.get('/revision', protect, async (req, res) => {
   try {
     const revisions = await Revision.find({ user: req.user._id, completed: false })
       .populate('question')
@@ -254,7 +257,7 @@ app.get('/api/revision', protect, async (req, res) => {
 });
 
 // PAYMENT ROUTES
-app.get('/api/payment/config', protect, async (req, res) => {
+apiRouter.get('/payment/config', protect, async (req, res) => {
   try {
     let settings = await Settings.findOne({ key: 'payment_settings' });
     if (!settings) {
@@ -271,7 +274,7 @@ app.get('/api/payment/config', protect, async (req, res) => {
   }
 });
 
-app.put('/api/payment/settings', protect, async (req, res) => {
+apiRouter.put('/payment/settings', protect, async (req, res) => {
   try {
     const { merchantUpiId, merchantName, proPriceINR } = req.body;
     const updates = {};
@@ -290,7 +293,7 @@ app.put('/api/payment/settings', protect, async (req, res) => {
   }
 });
 
-app.post('/api/payment/create-order', protect, async (req, res) => {
+apiRouter.post('/payment/create-order', protect, async (req, res) => {
   try {
     let settings = await Settings.findOne({ key: 'payment_settings' });
     const upiId = settings?.merchantUpiId || 'algopilot@upi';
@@ -313,7 +316,7 @@ app.post('/api/payment/create-order', protect, async (req, res) => {
   }
 });
 
-app.post('/api/payment/verify-payment', protect, async (req, res) => {
+apiRouter.post('/payment/verify-payment', protect, async (req, res) => {
   try {
     const { upi_transaction_id } = req.body;
     if (!upi_transaction_id || upi_transaction_id.trim().length < 4) {
@@ -337,7 +340,7 @@ app.post('/api/payment/verify-payment', protect, async (req, res) => {
 });
 
 // STATS ROUTES
-app.get('/api/stats/overview', protect, async (req, res) => {
+apiRouter.get('/stats/overview', protect, async (req, res) => {
   try {
     const solvedCount = await SolvedQuestion.countDocuments({ user: req.user._id });
     const revisionCount = await Revision.countDocuments({ user: req.user._id, completed: false });
@@ -350,7 +353,7 @@ app.get('/api/stats/overview', protect, async (req, res) => {
   }
 });
 
-app.get('/api/stats/leaderboard', protect, async (req, res) => {
+apiRouter.get('/stats/leaderboard', protect, async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ streak: -1, codeforcesRating: -1 }).limit(20);
     res.json({ success: true, leaderboard: users.map(safeUser) });
@@ -359,7 +362,7 @@ app.get('/api/stats/leaderboard', protect, async (req, res) => {
   }
 });
 
-app.get('/api/stats/admin-overview', protect, async (req, res) => {
+apiRouter.get('/stats/admin-overview', protect, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalQuestions = await Question.countDocuments();
@@ -370,5 +373,9 @@ app.get('/api/stats/admin-overview', protect, async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch admin metrics' });
   }
 });
+
+// Mount router on BOTH /api and / so Express matches any Vercel serverless request path!
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 module.exports = app;
